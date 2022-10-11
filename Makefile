@@ -2,6 +2,15 @@ NETWORK = consoledot
 CONTAINER_NAME = webconsoleapp
 SERVER_CONTAINER_NAME = webconsoleserver
 PORT_3SCALE = 8443
+API_URL = localhost:
+
+export PORT_3SCALE API_URL
+
+ifneq (,$(shell command -v podman-compose 2>/dev/null))
+DOCKER_COMPOSE ?= $(shell command -v podman-compose 2>/dev/null)
+else ifneq (,$(shell command -v docker-compose 2>/dev/null))
+DOCKER_COMPOSE ?= $(shell command -v docker-compose 2>/dev/null)
+endif
 
 build: 3scale/certs/service-chain.pem server/cockpit-bridge-websocket-connector.pyz containers
 
@@ -60,3 +69,16 @@ k8s-deploy: k8s-clean
 	oc create -f webconsoleapp-k8s.yaml
 
 .PHONY: containers run clean build k8s-clean k8s-deploy
+
+# {docker|podman}-composer rules
+.PHONY: .check-docker-compose
+.check-docker-compose:
+	[ "$(DOCKER_COMPOSE)" != "" ] || { echo "error:DOCKER_COMPOSE is empty; podman-compose or docker-compose is required"; exit 1; }
+
+.PHONY: up
+up: 3scale/certs/service-chain.pem .check-docker-compose
+	PORT_3SCALE="$(PORT_SCALE)" "$(DOCKER_COMPOSE)" -f webconsoleapp-local-compose.yaml up -d
+
+.PHONY: down
+down: .check-docker-compose
+	"$(DOCKER_COMPOSE)" -f webconsoleapp-local-compose.yaml down

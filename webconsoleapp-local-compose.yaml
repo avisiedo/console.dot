@@ -1,0 +1,35 @@
+# https://docs.docker.com/compose/compose-file/
+# https://docs.docker.com/compose/compose-file/compose-file-v2/
+---
+version: "2.4"
+services:
+  redis:
+    image: docker.io/redis
+
+  3scale:
+    image: docker.io/library/nginx
+    ports:
+      - ${PORT_3SCALE}:443
+    volumes:
+      - ${PWD}/3scale/nginx.conf:/etc/nginx/nginx.conf:z
+      - ${PWD}/3scale/certs:/etc/nginx/certs:z
+      - ${PWD}/3scale/htpasswd:/etc/nginx/.htpasswd:z
+
+  front-end:
+    depends_on:
+      - redis
+      - 3scale
+    hostname: webconsoleapp
+    image: localhost/webconsoleapp
+    ports:
+      - 8080:8080
+    environment:
+      # k8s compatible
+      # HACK: podman < 4 cannot DNS-resolve container names in pod, so use pod name
+      # value: "webconsoleapp-redis"
+      REDIS_SERVICE_HOST: "webconsoleapp"
+      API_URL: "https://localhost:${PORT_3SCALE}"
+      SESSION_INSTANCE_DOMAIN: ".dns.podman"
+    volumes:
+      - ${XDG_RUNTIME_DIR}:/run/podman/podman.sock
+      - ${PWD}/appservice:/usr/local/bin:z
